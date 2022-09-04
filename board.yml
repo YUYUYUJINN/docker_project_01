@@ -1,0 +1,63 @@
+
+version: "3.7"
+
+services:
+  api:
+    container_name: api-container
+    image: yusine51/board:requirement_1
+    deploy:
+      replicas: 2
+      placement:
+        constraints: [node.labels.name != board]
+      restart_policy:
+        condition: on-failure
+        max_attempts: 2
+    command: uwsgi --ini uwsgi.ini
+    ports:
+      - "8000"
+    volumes:
+      - api:/usr/src/app
+    networks:
+      - board_network
+
+  nginx:
+    container_name: nginx_container
+    image: yusine51/board:nginx_1
+    depends_on:
+      - api
+    deploy:
+      replicas: 2
+      placement:
+        constraints: [node.labels.name != board]
+      restart_policy:
+        condition: on-failure
+        max_attempts: 2
+    volumes:
+      - api:/usr/src/app
+    ports:
+      - "80"
+    networks:
+      - board_network
+
+  proxy:
+    image: dockercloud/haproxy
+    links:
+      - nginx
+      - api
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "8020:8000"
+      - "80:80"
+    networks:
+      - board_network
+    deploy:
+      mode: global
+      placement:
+        constraints: [node.labels.name == board]
+volumes:
+  api:
+
+networks:
+  board_network:
+    external: true
